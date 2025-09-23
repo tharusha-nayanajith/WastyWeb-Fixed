@@ -2,6 +2,7 @@
 const express = require('express');
 const customerController = require('../controllers/CustomerController');
 const { authMiddleware } = require('../middlewares/authMiddleware');
+const { loginLimiter, registerLimiter } = require('../middlewares/rateLimiters');
 const multer = require('multer');
 const path = require('path');
 
@@ -48,12 +49,12 @@ router.get('/download/:filename', (req, res) => {
 });
 
 // Define routes
-router.post('/register', upload.fields([
+router.post('/register', registerLimiter, upload.fields([
   { name: 'nicIdImage', maxCount: 1 },
   { name: 'addressVerificationDoc', maxCount: 1 }
 ]), customerController.register);
 
-router.post('/login', customerController.login);
+router.post('/login',loginLimiter, customerController.login);
 
 router.get('/dashboard', authMiddleware, (req, res) => {
   res.json({ message: `Welcome to your dashboard, ${req.customer.name}` });

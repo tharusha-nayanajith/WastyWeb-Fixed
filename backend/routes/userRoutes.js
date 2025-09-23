@@ -23,23 +23,24 @@ const {
   countAdmins,
   countCustomersRegisteredToday,
 } = require("../controllers/userController");
+const { loginLimiter, registerLimiter } = require('../middlewares/rateLimiters');
 // const { protect } = require("../middleware/authMiddleware");
 // const { customerAuthentication } = require("../middleware/authentication");
 
 // Register a new customer
-router.post("/register-customer", customerRegister);
+router.post("/register-customer",  registerLimiter,customerRegister);
 
 // Register a new admin
-router.post("/register-admin", adminRegister);
+router.post("/register-admin", registerLimiter, adminRegister);
 
 // Register a new manager
-router.post("/register-collecter", collectorRegister);
+router.post("/register-collecter",  registerLimiter,collectorRegister);
 
 // Login a user
-router.post("/login-customer", customerLogin);
+router.post("/login-customer", registerLimiter, customerLogin);
 
 // Login a user
-router.post("/login-adminAndManger", adminAndCollectorLogin);
+router.post("/login-adminAndManger", registerLimiter, adminAndCollectorLogin);
 
 // Logout a user
 router.post("/logout", logoutUser);

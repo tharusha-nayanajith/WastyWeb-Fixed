@@ -8,6 +8,10 @@ require("dotenv").config();
 const JWT_SECRET = process.env.JWT_SECRET;
 const moment = require("moment");
 
+// Lockout configuration
+const LOCK_TIME = 15 * 60 * 1000; // 15 minutes in ms
+const MAX_FAILED_ATTEMPTS = 5;
+
 const generateToken = (Id, role) => {
   return jwt.sign({ Id, role }, process.env.JWT_SECRET, { expiresIn: "10h" });
 };
@@ -270,36 +274,60 @@ const customerLogin = async (req, res) => {
   const { emailOrUsername, password } = req.body;
 
   try {
-    // Check if all required fields are provided
     if (!emailOrUsername || !password) {
-      return res
-        .status(400)
-        .json({ error: "Please provide email/username and password" });
+      return res.status(400).json({ error: "Please provide email/username and password" });
     }
 
-    // Find user by email or username and role of "Customer"
     const user = await User.findOne({
       $or: [{ email: emailOrUsername }, { username: emailOrUsername }],
       role: "Customer",
     });
 
-    // Check if user exists
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Verify password
+    // Check account lock
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const remainingMs = user.lockUntil - Date.now();
+      const remainingMinutes = Math.ceil(remainingMs / 60000);
+      return res.status(423).json({
+        error: "Account is locked due to multiple failed login attempts. Try again later.",
+        lockExpiresInMinutes: remainingMinutes
+      });
+    }
+
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
+      // increment failed attempts
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+
+      // Lock if exceed max
+      if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+        user.lockUntil = Date.now() + LOCK_TIME;
+      }
+      await user.save();
+
+      // If newly locked, inform user
+      if (user.lockUntil && user.lockUntil > Date.now()) {
+        return res.status(423).json({
+          error: `Account locked due to ${MAX_FAILED_ATTEMPTS} failed attempts. Try again in 15 minutes.`
+        });
+      }
+
       return res.status(401).json({ error: "Incorrect password" });
     }
+
+    // Successful login: reset counters
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    await user.save();
 
     // Generate token
     const token = jwt.sign({ userId: user.Id, role: user.role }, JWT_SECRET, {
       expiresIn: "1h",
     });
 
-    // Return user details and token
     res.status(200).json({
       userId: user.Id,
       fullName: user.fullName,
@@ -314,6 +342,7 @@ const customerLogin = async (req, res) => {
   }
 };
 
+
 const adminAndCollectorLogin = async (req, res) => {
   const { role, emailOrUsername, password } = req.body;
 
@@ -321,16 +350,16 @@ const adminAndCollectorLogin = async (req, res) => {
     // Check if all required fields are provided
     if (!role || !emailOrUsername || !password) {
       return res
-        .status(400)
-        .json({ error: "Please provide role, email/username, and password" });
+          .status(400)
+          .json({ error: "Please provide role, email/username, and password" });
     }
 
     // Validate role
     const validRoles = ["Admin", "Collector"];
     if (!validRoles.includes(role)) {
       return res
-        .status(400)
-        .json({ error: "Invalid role. Role must be either Admin or Collector" });
+          .status(400)
+          .json({ error: "Invalid role. Role must be either Admin or Collector" });
     }
 
     // Find user by email or username and role
@@ -344,11 +373,41 @@ const adminAndCollectorLogin = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // ✅ Check account lock
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const remainingMs = user.lockUntil - Date.now();
+      const remainingMinutes = Math.ceil(remainingMs / 60000);
+      return res.status(423).json({
+        error: "Account is locked due to multiple failed login attempts. Try again later.",
+        lockExpiresInMinutes: remainingMinutes,
+      });
+    }
     // Verify password
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
+      // increment failed attempts
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+
+      // Lock if exceed max
+      if (user.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+        user.lockUntil = Date.now() + LOCK_TIME;
+      }
+      await user.save();
+
+      // If newly locked, inform user
+      if (user.lockUntil && user.lockUntil > Date.now()) {
+        return res.status(423).json({
+          error: `Account locked due to ${MAX_FAILED_ATTEMPTS} failed attempts. Try again in 15 minutes.`,
+        });
+      }
+
       return res.status(401).json({ error: "Incorrect password" });
     }
+
+    // ✅ Successful login: reset counters
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    await user.save();
 
     // Generate token
     const token = jwt.sign({ userId: user.Id, role: user.role }, JWT_SECRET, {

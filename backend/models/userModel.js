@@ -42,12 +42,20 @@ const userSchema = new Schema(
       type: String,
       required: true,
     },
-   
+      // 🔒 Add these fields
+      failedLoginAttempts: { type: Number, default: 0 },
+      lockUntil: { type: Date, default: null },
+
   },
   {
     timestamps: true,
   }
 );
+// 🔒 Virtual helper
+userSchema.virtual("isLocked").get(function () {
+    return !!(this.lockUntil && this.lockUntil > Date.now());
+});
+
 
 const User = mongoose.model("User", userSchema);
 

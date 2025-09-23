@@ -19,7 +19,14 @@ const customerSchema = new mongoose.Schema({
   nicIdImage: { type: String, required: true }, // File path for NIC ID image
   addressVerificationDoc: { type: String, required: true }, // File path for address verification document
   status: { type: String, enum: ['Pending Approval', 'Approved', 'Rejected'], default: 'Pending Approval' }, // Registration status
+  // 🔒 Add these fields
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockUntil: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now }
+});
+// 🔒 Virtual helper
+customerSchema.virtual("isLocked").get(function () {
+  return !!(this.lockUntil && this.lockUntil > Date.now());
 });
 
 // Create and export the Customer model

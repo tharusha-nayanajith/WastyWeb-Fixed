@@ -19,6 +19,10 @@ exports.register = async (req, res) => {
       postalCode: req.body['address.postalCode']
     };
 
+    // at top
+    const LOCK_TIME = 15 * 60 * 1000;
+    const MAX_FAILED_ATTEMPTS = 5;
+
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -56,14 +60,40 @@ exports.login = async (req, res) => {
       // User not found
       return res.status(400).json({ error: 'Invalid email or password' });
     }
+    if (customer.lockUntil && customer.lockUntil > Date.now()) {
+      const remainingMs = customer.lockUntil - Date.now();
+      const remainingMinutes = Math.ceil(remainingMs / 60000);
+      return res.status(423).json({
+        error: 'Account locked due to multiple failed attempts.',
+        lockExpiresInMinutes: remainingMinutes
+      });
+    }
+
 
     // Compare provided password with hashed password in the database
     const isMatch = await bcrypt.compare(password, customer.password);
     if (!isMatch) {
-      // Password does not match
+      customer.failedLoginAttempts = (customer.failedLoginAttempts || 0) + 1;
+      if (customer.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+        customer.lockUntil = Date.now() + LOCK_TIME;
+      }
+      await customer.save();
+
+      if (customer.lockUntil && customer.lockUntil > Date.now()) {
+        return res.status(423).json({ error: `Account locked due to ${MAX_FAILED_ATTEMPTS} failed attempts. Try again later.` });
+      }
+
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
+    // Reset on success
+    customer.failedLoginAttempts = 0;
+    customer.lockUntil = null;
+    await customer.save();
+
+    if (customer.status !== 'Approved') {
+      return res.status(403).json({ error: `Account is ${customer.status}` });
+    }
     // Check if the user's status is approved
     if (customer.status !== 'Approved') {
       return res.status(403).json({ error: `Account is ${customer.status}` });
