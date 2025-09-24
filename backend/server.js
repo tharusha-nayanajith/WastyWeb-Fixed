@@ -29,7 +29,8 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json({ limit: "20mb" }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Do NOT expose raw uploads publicly; use authorized download route instead
+// app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use("/user", require("./routes/userRoutes.js"));

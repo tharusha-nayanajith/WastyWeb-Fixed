@@ -7,6 +7,11 @@ const validator = require("validator");
 require("dotenv").config();
 const JWT_SECRET = process.env.JWT_SECRET;
 const moment = require("moment");
+const { OAuth2Client } = require('google-auth-library');
+const Customer = require("../models/customerModel");
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
+const crypto = require('crypto');
 
 const generateToken = (Id, role) => {
   return jwt.sign({ Id, role }, process.env.JWT_SECRET, { expiresIn: "10h" });
@@ -370,6 +375,67 @@ const adminAndCollectorLogin = async (req, res) => {
   }
 };
 
+
+// Google OAuth2 Login: verifies Google ID token; logs in existing users by email.
+// If no matching user, instruct client to complete registration flow.
+const loginWithGoogle = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    if (!GOOGLE_CLIENT_ID || !googleClient) {
+      return res.status(500).json({ error: "Google login not configured" });
+    }
+    if (!idToken) {
+      return res.status(400).json({ error: "Missing idToken" });
+    }
+
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+    const payload = ticket.getPayload();
+    const email = payload?.email;
+    const emailVerified = payload?.email_verified;
+    const fullName = payload?.name || '';
+
+    if (!email || !emailVerified) {
+      return res.status(400).json({ error: "Google account not verified or missing email" });
+    }
+
+    // 1) Try unified User collection (role: Customer)
+    const user = await User.findOne({ email, role: "Customer" });
+    if (user) {
+      const token = jwt.sign({ userId: user.Id, role: user.role }, JWT_SECRET, { expiresIn: "1h" });
+      return res.status(200).json({
+        userId: user.Id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        token,
+        message: "Login with Google successful"
+      });
+    }
+
+    // 2) Try separate Customer collection (registered via /customer/register)
+    const customer = await Customer.findOne({ email });
+    if (customer) {
+      if (customer.status !== 'Approved') {
+        return res.status(403).json({ error: `Account is ${customer.status}` });
+      }
+      const token = jwt.sign({ id: customer._id, email: customer.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+      return res.status(200).json({
+        token,
+        customerId: customer._id,
+        message: 'Login successful'
+      });
+    }
+
+    // 3) Not found anywhere -> ask to register
+    return res.status(404).json({
+      error: "No account found for this Google email. Please register first.",
+      suggestedPayload: { fullName, email }
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Google login failed" });
+  }
+};
 
 const logoutUser = async (req, res) => {
   try {
@@ -769,4 +835,5 @@ module.exports = {
   countCollectors,
   countAdmins,
   countCustomersRegisteredToday,
+  loginWithGoogle,
 };

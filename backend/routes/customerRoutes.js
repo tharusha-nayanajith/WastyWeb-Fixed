@@ -23,26 +23,35 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 2 }, // 5MB per file, max 2 files
   fileFilter: (req, file, cb) => {
-    const fileTypes = /jpeg|jpg|png/;
-    const mimeType = fileTypes.test(file.mimetype);
-    if (mimeType) {
-      cb(null, true);
-    } else {
-      cb(new Error('File format should be JPEG, JPG, or PNG'), false);
+    const allowedMime = ["image/jpeg", "image/png"]; // accept only jpeg/png
+    const allowedExt = [".jpeg", ".jpg", ".png"]; // enforced by storage name
+    const isMimeOk = allowedMime.includes(file.mimetype);
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const isExtOk = allowedExt.includes(ext);
+    if (isMimeOk && isExtOk) {
+      return cb(null, true);
     }
+    return cb(new Error('Invalid file type. Only JPEG/PNG are allowed'), false);
   }
 });
 
 // Download route
-router.get('/download/:filename', (req, res) => {
-  const filename = req.params.filename;
-  const file = path.join(__dirname, '../uploads', filename); // Adjust path if necessary
+router.get('/download/:filename', authMiddleware, (req, res) => {
+  const raw = req.params.filename || '';
+  const filename = path.basename(raw); // prevent path traversal
+  const uploadsDir = path.join(__dirname, '../uploads');
+  const file = path.join(uploadsDir, filename);
+
+  if (!file.startsWith(uploadsDir)) {
+    return res.status(400).json({ error: 'Invalid path' });
+  }
 
   res.download(file, filename, (err) => {
     if (err) {
       console.error("File download error:", err);
-      res.status(404).send("File not found.");
+      return res.status(404).send("File not found.");
     }
   });
 });

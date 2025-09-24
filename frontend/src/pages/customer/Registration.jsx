@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AccountInfo from '../../components/customer/AccountInfo';
 import AddressInfo from '../../components/customer/AddressInfo';
 import Verification from '../../components/customer/Verification';
 import Logo from '../../images/logo.png'
 import axios from 'axios';
+import GoogleLoginButton from '../../components/GoogleLoginButton';
 
 function Registration() {
   const navigate = useNavigate();
+  const [googlePrefill, setGooglePrefill] = useState({ fromGoogle: false });
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     name: '',
@@ -18,6 +20,22 @@ function Registration() {
     nicIdImage: null,
     addressVerificationDoc: null,
   });
+
+  useEffect(() => {
+    // If redirected with prefill (e.g., from Google), parse query params
+    const params = new URLSearchParams(window.location.search);
+    const name = params.get('name');
+    const email = params.get('email');
+    const from = params.get('from');
+    if (from === 'google') {
+      setGooglePrefill({ fromGoogle: true });
+    }
+    setFormData((prev) => ({
+      ...prev,
+      name: name || prev.name,
+      email: email || prev.email,
+    }));
+  }, []);
 
   const nextStep = () => setStep(step + 1);
   const prevStep = () => setStep(step - 1);
@@ -70,7 +88,7 @@ function Registration() {
   const renderStep = () => {
     switch (step) {
       case 1:
-        return <AccountInfo nextStep={nextStep} handleChange={handleChange} values={formData} />;
+        return <AccountInfo nextStep={nextStep} handleChange={handleChange} values={{...formData, _fromGoogle: googlePrefill.fromGoogle}} />;
       case 2:
         return <AddressInfo nextStep={nextStep} prevStep={prevStep} handleChange={handleChange} values={formData} />;
       case 3:
@@ -86,6 +104,31 @@ function Registration() {
 
         {/* Logo */}
       <img src={Logo} alt="Logo" className="w-52 mb-4" />
+
+      {/* Optional: Register with Google (prefills name/email) */}
+      <GoogleLoginButton
+        onSuccess={(data)=>{
+          // If user already exists, this will log them in. Redirect to dashboard.
+          const { token, userId } = data || {};
+          if (token) {
+            localStorage.setItem('token', token);
+            if (userId) localStorage.setItem('customerId', userId);
+            navigate('/customer/dashboard');
+          }
+        }}
+        onError={(e)=>{
+          const status = e?.response?.status;
+          const suggested = e?.response?.data?.suggestedPayload;
+          if (status === 404 && suggested) {
+            setGooglePrefill({ fromGoogle: true });
+            setFormData((prev)=>({
+              ...prev,
+              name: suggested.fullName || prev.name,
+              email: suggested.email || prev.email,
+            }));
+          }
+        }}
+      />
 
 {/* Title and Description */}
 <h1 className="text-2xl font-semibold text-gray-800 mb-1">Registration</h1>

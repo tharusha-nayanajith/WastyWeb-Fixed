@@ -15,16 +15,19 @@ function AccountInfo({ nextStep, handleChange, values }) {
     }
 
     if (!values.phone) newErrors.phone = "Phone is required";
-    if (!values.password) {
-      newErrors.password = "Password is required";
-    } else if (values.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
-
-    if (!confirmPassword) {
-      newErrors.confirmPassword = "Confirm Password is required";
-    } else if (values.password !== confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
+    // If coming from Google, skip password validation in Account step
+    const isGoogle = values._fromGoogle;
+    if (!isGoogle) {
+      if (!values.password) {
+        newErrors.password = "Password is required";
+      } else if (values.password.length < 6) {
+        newErrors.password = "Password must be at least 6 characters";
+      }
+      if (!confirmPassword) {
+        newErrors.confirmPassword = "Confirm Password is required";
+      } else if (values.password !== confirmPassword) {
+        newErrors.confirmPassword = "Passwords do not match";
+      }
     }
 
     setErrors(newErrors);
@@ -76,6 +79,7 @@ function AccountInfo({ nextStep, handleChange, values }) {
         {errors.phone && <p className="text-sm text-red-500">{errors.phone}</p>}
       </div>
 
+      {!values._fromGoogle && (
       <div className="flex space-x-4">
         <div className="w-1/2 space-y-1" >
           <label className="block text-sm font-medium text-gray-700">Password</label>
@@ -101,6 +105,7 @@ function AccountInfo({ nextStep, handleChange, values }) {
           {errors.confirmPassword && <p className="text-sm text-red-500">{errors.confirmPassword}</p>}
         </div>
       </div>
+      )}
 
       <button type="submit" className="w-full p-2 bg-black text-white rounded-md">
         Next

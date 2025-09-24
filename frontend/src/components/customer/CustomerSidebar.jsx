@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBars, faTimes } from '@fortawesome/free-solid-svg-icons';
 import Logo from '../../images/logo.png'
+import GoogleLogoutButton from '../GoogleLogoutButton';
 
 const CustomerSidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -85,6 +86,11 @@ const CustomerSidebar = () => {
               </NavLink>
             </li>
           </ul>
+        </div>
+        <div className="px-4">
+          <GoogleLogoutButton onLoggedOut={() => {
+            window.location.href = '/customer/login';
+          }} className="w-full mt-2 px-4 py-2 bg-red-500 text-white rounded" />
         </div>
       </div>
     </div>
