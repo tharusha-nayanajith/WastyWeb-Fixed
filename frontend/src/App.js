@@ -54,6 +54,7 @@ import CollectionDetailsPage from './pages/customer/CollectionDetailsPage';
 
 import Charts from "./pages/charts/ChartsPage"
 
+import useSessionTimeout from './hooks/useSessionTimeout';
 
 
 
@@ -64,6 +65,8 @@ function App() {
   return (
     <div className="App">
       <BrowserRouter>
+          {/* ✅ Mount SessionHandler here */}
+          <SessionHandler />
       <Routes>
 
        {/* Admin and Collector  */}
@@ -147,5 +150,9 @@ function App() {
     </div>
   );
 }
-
+// ✅ Separate component that uses the session timeout hook
+function SessionHandler() {
+    useSessionTimeout();
+    return null;
+}
 export default App;
