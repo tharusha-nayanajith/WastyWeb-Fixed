@@ -4,7 +4,9 @@ const jwt = require('jsonwebtoken');
 const Customer = require('../models/customerModel');
 const multer = require('multer');
 
-
+// at top
+const LOCK_TIME = 15 * 60 * 1000;
+const MAX_FAILED_ATTEMPTS = 5;
 // Registration controller with detailed logging
 exports.register = async (req, res) => {
   try {
@@ -19,9 +21,7 @@ exports.register = async (req, res) => {
       postalCode: req.body['address.postalCode']
     };
 
-    // at top
-    const LOCK_TIME = 15 * 60 * 1000;
-    const MAX_FAILED_ATTEMPTS = 5;
+
 
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
