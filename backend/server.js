@@ -7,6 +7,7 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const path = require('path');
 const cloudinary = require('cloudinary').v2;
+const bodyParser = require("body-parser");
 
 const app = express();
 const PORT = process.env.PORT || 9500;
@@ -76,6 +77,14 @@ mongoose.connect(URL, { useNewUrlParser: true, useUnifiedTopology: true })
     console.error("MongoDB connection error:", err);
     process.exit(1); // fail fast if DB connection fails
   });
+
+// Middlewares
+app.use(cors());
+app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "20mb" }));
+// Do NOT expose raw uploads publicly; use authorized download route instead
+// app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes — keep routes after middlewares
 app.use("/user", require("./routes/userRoutes.js"));

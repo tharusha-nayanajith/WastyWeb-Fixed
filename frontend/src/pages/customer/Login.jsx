@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../../images/logo.png'
+import GoogleLoginButton from '../../components/GoogleLoginButton'
 
 
 function LoginForm() {
@@ -61,6 +62,20 @@ function LoginForm() {
         <button type="submit" className="w-full py-2 px-4 text-white bg-black rounded-lg hover:bg-gray-800 transition">
           Login
         </button>
+        <GoogleLoginButton onSuccess={(data)=>{
+          const { token, userId, fullName, email } = data;
+          if (token) {
+            localStorage.setItem('token', token);
+            if (userId) localStorage.setItem('customerId', userId);
+            navigate('/customer/dashboard');
+          } else {
+            const params = new URLSearchParams();
+            if (fullName) params.set('name', fullName);
+            if (email) params.set('email', email);
+            params.set('from', 'google');
+            navigate(`/customer/register?${params.toString()}`);
+          }
+        }} onError={(e)=> setError(e.response?.data?.error || 'Google login failed')} />
       </form>
     </div>
   );

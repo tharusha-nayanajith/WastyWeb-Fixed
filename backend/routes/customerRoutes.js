@@ -1,3 +1,4 @@
+// customerRoutes.js
 const express = require('express');
 const customerController = require('../controllers/CustomerController');
 const { authMiddleware, adminOnly } = require('../middlewares/authMiddleware');
@@ -13,22 +14,27 @@ const storage = multer.diskStorage({
     cb(null, 'uploads/'); // keep outside static serving
   },
   filename: (req, file, cb) => {
+    // Extract the file extension from the original file name
     const extension = path.extname(file.originalname);
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    // Save the file with its original extension
     cb(null, `${uniqueSuffix}${extension}`);
   }
 });
 
 const upload = multer({
   storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 2 }, // 5MB per file, max 2 files
   fileFilter: (req, file, cb) => {
-    const fileTypes = /jpeg|jpg|png/;
-    const mimeType = fileTypes.test(file.mimetype);
-    if (mimeType) {
-      cb(null, true);
-    } else {
-      cb(new Error('File format should be JPEG, JPG, or PNG'), false);
+    const allowedMime = ["image/jpeg", "image/png"]; // accept only jpeg/png
+    const allowedExt = [".jpeg", ".jpg", ".png"]; // enforced by storage name
+    const isMimeOk = allowedMime.includes(file.mimetype);
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const isExtOk = allowedExt.includes(ext);
+    if (isMimeOk && isExtOk) {
+      return cb(null, true);
     }
+    return cb(new Error('Invalid file type. Only JPEG/PNG are allowed'), false);
   }
 });
 
@@ -41,8 +47,16 @@ const upload = multer({
  */
 router.get('/download/:filename', authMiddleware, async (req, res) => {
   try {
+    const raw = req.params.filename || '';
     const filename = path.basename(req.params.filename); // sanitize
+    const filename2 = path.basename(raw); // prevent path traversal
     const filePath = path.join(__dirname, '../uploads', filename);
+    const uploadsDir = path.join(__dirname, '../uploads');
+    const file = path.join(uploadsDir, filename2);
+
+    if (!file.startsWith(uploadsDir)) {
+      return res.status(400).json({ error: 'Invalid path' });
+    }
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'File not found' });
@@ -58,6 +72,13 @@ router.get('/download/:filename', authMiddleware, async (req, res) => {
         return res.status(403).json({ error: 'Access denied: not your document' });
       }
     }
+
+    res.download(file, filename2, (err) => {
+      if (err) {
+        console.error("File download error:", err);
+        return res.status(404).send("File not found.");
+     }
+    });
 
     res.download(filePath, filename, (err) => {
       if (err) {

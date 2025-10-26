@@ -22,6 +22,7 @@ const {
   countCollectors,
   countAdmins,
   countCustomersRegisteredToday,
+  loginWithGoogle,
 } = require("../controllers/userController");
 const { loginLimiter, registerLimiter } = require('../middlewares/rateLimiters');
 // const { protect } = require("../middleware/authMiddleware");
@@ -41,6 +42,9 @@ router.post("/login-customer", registerLimiter, customerLogin);
 
 // Login a user
 router.post("/login-adminAndManger", registerLimiter, adminAndCollectorLogin);
+
+// Login with Google ID token
+router.post("/login-google", loginWithGoogle);
 
 // Logout a user
 router.post("/logout", logoutUser);

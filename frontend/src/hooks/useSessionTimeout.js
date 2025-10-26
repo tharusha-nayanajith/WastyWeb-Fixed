@@ -3,7 +3,7 @@ import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const INACTIVITY_MINUTES = 15;
+const INACTIVITY_MINUTES = 1;
 const INACTIVITY_MS = INACTIVITY_MINUTES * 60 * 1000;
 
 export default function useSessionTimeout() {
